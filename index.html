@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Support dashboard</title>
+    <link rel="stylesheet" href="/src/dashboard.css">
+    <script type="module" src="/src/dashboard.ts"></script>
+  </head>
+  <body>
+    <main>
+      <h1>Support dashboard</h1>
+      <button id="open-ticket" aria-controls="ticket" aria-expanded="false">
+        Open ticket: Delivery status
+      </button>
+      <section id="ticket" aria-labelledby="ticket-title" hidden>
+        <h2 id="ticket-title">Delivery status</h2>
+        <ul id="messages"></ul>
+        <button id="generate">Generate summary</button>
+        <button id="approve" disabled>Approve summary</button>
+        <p id="status" role="status"></p>
+        <p id="summary" hidden></p>
+      </section>
+    </main>
+  </body>
+</html>
