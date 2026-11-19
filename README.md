@@ -24,25 +24,21 @@ Copy `.env.example` to `.env` to set local overrides. Variables already set in t
 | --- | --- |
 | `PW_PORT` | Vite port for Playwright-managed runs. Defaults to 4173. |
 | `PW_BASE_URL` | Base URL of an already running dashboard. Setting it skips Playwright-managed Vite startup. |
-| `PW_WORKERS` | Worker count. Defaults to two on CI and Playwright's default locally. |
-| `PW_RETRIES` | Retry count. Defaults to two on CI and zero locally. |
 | `PW_SLOW_MO` | Optional delay between browser actions in milliseconds. |
 | `PW_USER_AGENT` | Optional Chromium user agent override. |
 
-CI rejects focused tests and fails the release gate if a test only passes on retry. Chromium remains the release-gate browser.
-
+CI rejects focused tests and runs Chromium with one worker and up to two retries per test. A test that passes on retry is reported as flaky and can still pass the CI job. Local runs use Playwright's default worker count and zero retries. Use CLI flags such as `--workers=2` or `--retries=1` to override these settings for a run.
 
 ## Validation Architecture and Release-Blocking Criteria
 
 - **Dashboard at runtime.** Approval requires at least one citation, and every cited message ID must belong to the current ticket. Missing citations and citations from another ticket keep approval disabled, including when valid and invalid citations appear together. The dashboard does not currently enforce critical-fact consistency at runtime.
-- **Service boundary and UI tests.** Vite serves a static success response for manual use and the unmocked smoke test. The other browser tests intercept the same endpoint with `page.route()` and use the dashboard and ticket page objects to exercise the UI. Each test has an isolated page and its own response queue.
+- **Service boundary and UI tests.** Vite serves `app/public/api/summary.json` at `GET /api/summary.json` for manual use, the unmocked smoke test, and the API test. The other browser tests intercept the same endpoint with `page.route()` and use the dashboard and ticket page objects to exercise the UI. Each test has an isolated page and its own response queue.
 - **Deterministic evaluation in the test suite.** The evaluator reuses the dashboard's citation rule and checks recognized USD refund amounts and order statuses against structured facts in the cited synthetic messages. Each recognized claim needs support from at least one cited message. These tests call the pure TypeScript evaluator without opening a browser page.
 - **CI release criteria.** The [GitHub Actions workflow](.github/workflows/playwright.yml) runs on pushes and pull requests. Type checking, the UI and API suites, and the deterministic evaluation suite must pass. A failure in any required step fails the job. Require the **Release gate checks** status in the target branch's protection rule or ruleset to enforce the gate before merging.
 
 ## Project Layout
 
 - `app/` is the Vite root and contains the dashboard entry point, source, and public summary fixture.
-
 - `pages/ui/` contains the browser page objects. `api/` contains the Playwright summary endpoint client.
 - `tests/ui/`, `tests/api/`, and `tests/evaluation/` contain browser, service, and deterministic evaluator checks.
 - `fixtures/` wires up page objects, test data, and summary response mocks.
