@@ -1,6 +1,6 @@
-﻿# Deterministic summary evaluation
+# Deterministic summary evaluation
 
-Run the complete release-gate suite with `npm test` or only the evaluator cases with `npm test -- tests/evaluation.spec.ts`. The evaluator tests use Playwright's test runner and assertions without opening a browser page.
+Run the complete release-gate suite with `npm test` or only the evaluator cases with `npm test -- tests/evaluation/summary.evaluation.spec.ts`. The evaluator tests use Playwright's test runner and assertions without opening a browser page.
 
 The shared citation validator requires at least one cited ID and checks every ID against the current ticket. The dashboard uses this rule for approval. Separately, the evaluator checks that each recognized critical claim has a matching structured fact in at least one cited message. It reports invalid citations, unsupported refund amounts, and unsupported order statuses.
 

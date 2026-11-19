@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { evaluateSummary, type TicketMessage } from '../src/evaluation/summary';
+import { evaluateSummary, type TicketMessage } from '../../app/src/evaluation/summary';
 
 const messages = [
   { id: 'm1', text: 'The customer requested an update.' },

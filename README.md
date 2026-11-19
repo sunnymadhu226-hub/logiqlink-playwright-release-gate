@@ -16,12 +16,38 @@ npm test -- --workers=2
 
 Run `npm run dev` to open the dashboard manually at the URL Vite prints. Run `npm run test:ui` for Playwright's interactive runner or `npm run test:headed` to see Chromium during browser tests.
 
+## Playwright Configuration
+
+Copy `.env.example` to `.env` to set local overrides. Variables already set in the shell take precedence.
+
+| Variable | Behavior |
+| --- | --- |
+| `PW_PORT` | Vite port for Playwright-managed runs. Defaults to 4173. |
+| `PW_BASE_URL` | Base URL of an already running dashboard. Setting it skips Playwright-managed Vite startup. |
+| `PW_WORKERS` | Worker count. Defaults to two on CI and Playwright's default locally. |
+| `PW_RETRIES` | Retry count. Defaults to two on CI and zero locally. |
+| `PW_SLOW_MO` | Optional delay between browser actions in milliseconds. |
+| `PW_USER_AGENT` | Optional Chromium user agent override. |
+
+CI rejects focused tests and fails the release gate if a test only passes on retry. Chromium remains the release-gate browser.
+
+
 ## Validation Architecture and Release-Blocking Criteria
 
 - **Dashboard at runtime.** Approval requires at least one citation, and every cited message ID must belong to the current ticket. Missing citations and citations from another ticket keep approval disabled, including when valid and invalid citations appear together. The dashboard does not currently enforce critical-fact consistency at runtime.
-- **Service boundary and UI tests.** Vite serves a static success response for manual use and the unmocked smoke test. The other browser tests intercept the same endpoint with `page.route()` and use the support dashboard page object to exercise the UI. Each test has an isolated page and its own response queue.
+- **Service boundary and UI tests.** Vite serves a static success response for manual use and the unmocked smoke test. The other browser tests intercept the same endpoint with `page.route()` and use the dashboard and ticket page objects to exercise the UI. Each test has an isolated page and its own response queue.
 - **Deterministic evaluation in the test suite.** The evaluator reuses the dashboard's citation rule and checks recognized USD refund amounts and order statuses against structured facts in the cited synthetic messages. Each recognized claim needs support from at least one cited message. These tests call the pure TypeScript evaluator without opening a browser page.
-- **CI release criteria.** The [GitHub Actions workflow](.github/workflows/release-gate.yml) runs on pushes and pull requests. Type checking, the UI suite, and the deterministic evaluation suite must pass. A failure in any required step fails the job. Require the **Release gate checks** status in the target branch's protection rule or ruleset to enforce the gate before merging.
+- **CI release criteria.** The [GitHub Actions workflow](.github/workflows/playwright.yml) runs on pushes and pull requests. Type checking, the UI and API suites, and the deterministic evaluation suite must pass. A failure in any required step fails the job. Require the **Release gate checks** status in the target branch's protection rule or ruleset to enforce the gate before merging.
+
+## Project Layout
+
+- `app/` is the Vite root and contains the dashboard entry point, source, and public summary fixture.
+
+- `pages/ui/` contains the browser page objects. `api/` contains the Playwright summary endpoint client.
+- `tests/ui/`, `tests/api/`, and `tests/evaluation/` contain browser, service, and deterministic evaluator checks.
+- `fixtures/` wires up page objects, test data, and summary response mocks.
+- `test-data/` contains synthetic ticket inputs.
+- `config/` contains local server settings consumed by the root Playwright configuration.
 
 ## Test Scenarios
 
@@ -29,6 +55,7 @@ Run `npm run dev` to open the dashboard manually at the URL Vite prints. Run `np
 | --- | --- |
 | 1 unmocked browser test | Opens a ticket, displays the local summary, and approves it. |
 | 6 mocked browser tests | Valid approval, insufficient information, 503 with retry available, successful retry, missing citations, and mixed current-ticket and cross-ticket citations. |
+| 1 API test | Checks the local summary response and its citation. |
 | 11 deterministic evaluation tests | Valid, missing, empty, cross-ticket, and mixed citations. Supported and unsupported refund and order-status claims, including a refund supported only by an uncited message. |
 
 ## CI Evidence
@@ -44,7 +71,7 @@ Download the **playwright-evidence** artifact from the workflow run. The upload 
 Run the following from the repository root in PowerShell. The temporary change accepts any nonempty citation list, including the mixed list in the cross-ticket test. The script restores the original file even when the test fails.
 
 ```powershell
-$dashboard = (Resolve-Path -LiteralPath src/dashboard.ts).Path
+$dashboard = (Resolve-Path -LiteralPath app/src/dashboard.ts).Path
 $original = [IO.File]::ReadAllBytes($dashboard)
 $source = [Text.Encoding]::UTF8.GetString($original)
 $before = 'const citationsValid = hasValidCitations(result.sourceIds, messages);'
@@ -53,7 +80,7 @@ if (!$source.Contains($before)) { throw 'Expected citation check is missing.' }
 
 try {
   [IO.File]::WriteAllText($dashboard, $source.Replace($before, $after))
-  npm test -- tests/summary.spec.ts -g "blocks approval when a citation belongs to another ticket"
+  npm test -- tests/ui/ticket.spec.ts -g "blocks approval when a citation belongs to another ticket"
   $regressionExit = $LASTEXITCODE
 } finally {
   [IO.File]::WriteAllBytes($dashboard, $original)
@@ -62,7 +89,7 @@ try {
 if ($regressionExit -ne 1) { throw "Expected exit 1, got $regressionExit." }
 ```
 
-Expect one failure at the status assertion. The test expects `Summary citations are missing or invalid.` and the regressed dashboard shows `Summary ready for approval.` Inspect or copy the failure evidence before running the full suite again, because Playwright replaces its output directories. After restoration, run `npm run typecheck` and `npm test`. All 18 tests should pass.
+Expect one failure at the status assertion. The test expects `Summary citations are missing or invalid.` and the regressed dashboard shows `Summary ready for approval.` Inspect or copy the failure evidence before running the full suite again, because Playwright replaces its output directories. After restoration, run `npm run typecheck` and `npm test`. All 19 tests should pass.
 
 ## Limitations and Future Improvements
 
